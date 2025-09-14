@@ -70,7 +70,7 @@ async def check_new_video():
         # Ensure the channel is a text channel
         if isinstance(channel, discord.TextChannel):
             # Send custom message
-            await channel.send(f"@everyone VampBlox uploaded!\n{video_url}")
+            await channel.send(f"@everyone The main channel 404Crepes uploaded something!\n{video_url}")
             
         else:
             print("The channel is not a text channel!")
