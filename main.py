@@ -74,6 +74,22 @@ async def check_new_video():
             
         else:
             print("The channel is not a text channel!")
+     except Exception as e:
+        print(f"Error in check_new_video loop: {e}")
+
+LAST_VIDEO_FILE = "last_video.txt"
+
+def save_last_video(video_id):
+    with open(LAST_VIDEO_FILE, "w") as f:
+        f.write(video_id)
+
+def load_last_video():
+    if os.path.exists(LAST_VIDEO_FILE):
+        with open(LAST_VIDEO_FILE, "r") as f:
+            return f.read().strip()
+    return None
+
+last_video_id = load_last_video()
 
 # ------------------------------
 # Bot Events
