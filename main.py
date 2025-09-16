@@ -74,8 +74,7 @@ async def check_new_video():
             
         else:
             print("The channel is not a text channel!")
-     except Exception as e:
-        print(f"Error in check_new_video loop: {e}")
+
 
 LAST_VIDEO_FILE = "last_video.txt"
 
