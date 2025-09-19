@@ -3,8 +3,6 @@ from discord.ext import tasks, commands
 from googleapiclient.discovery import build
 import os
 
-
-
 # ------------------------------
 # Environment Variables
 # ------------------------------
@@ -37,50 +35,17 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # ------------------------------
 youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
 
-# Track the last posted video
-last_video_id = None
-
-def get_latest_video():
-    """Fetch the latest video from the YouTube channel."""
-    request = youtube.search().list(
-        part="snippet",
-        channelId=YOUTUBE_CHANNEL_ID,
-        maxResults=1,
-        order="date"
-    )
-    response = request.execute()
-    video = response['items'][0]
-    video_id = video['id']['videoId']
-    video_title = video['snippet']['title']
-    video_url = f"https://www.youtube.com/watch?v={video_id}"
-    return video_id, video_title, video_url
-
 # ------------------------------
-# Task to Check New Video
+# Save/load last video
 # ------------------------------
-@tasks.loop(minutes=5)
-async def check_new_video():
-    global last_video_id
-    video_id, video_title, video_url = get_latest_video()
-
-    if video_id != last_video_id:
-        last_video_id = video_id
-        channel = bot.get_channel(DISCORD_CHANNEL_ID)
-
-        # Ensure the channel is a text channel
-        if isinstance(channel, discord.TextChannel):
-            # Send custom message
-            await channel.send(f"@everyone The main channel 404Crepes uploaded something!\n{video_url}")
-            
-        else:
-            print("The channel is not a text channel!")
-
-
 LAST_VIDEO_FILE = "last_video.txt"
 
 def save_last_video(video_id):
-    with open(LAST_VIDEO_FILE, "w") as f:
-        f.write(video_id)
+    try:
+        with open(LAST_VIDEO_FILE, "w") as f:
+            f.write(video_id)
+    except Exception as e:
+        print(f"Error saving last video: {e}")
 
 def load_last_video():
     if os.path.exists(LAST_VIDEO_FILE):
@@ -91,15 +56,61 @@ def load_last_video():
 last_video_id = load_last_video()
 
 # ------------------------------
+# Fetch latest video
+# ------------------------------
+def get_latest_video():
+    try:
+        request = youtube.search().list(
+            part="snippet",
+            channelId=YOUTUBE_CHANNEL_ID,
+            maxResults=1,
+            order="date",
+            type="video"  # ensure only videos, not playlists/shorts
+        )
+        response = request.execute()
+        video = response['items'][0]
+        video_id = video['id']['videoId']
+        video_title = video['snippet']['title']
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
+        return video_id, video_title, video_url
+    except Exception as e:
+        print(f"Error fetching video: {e}")
+        return None, None, None
+
+# ------------------------------
+# Task to Check New Video
+# ------------------------------
+@tasks.loop(minutes=5)
+async def check_new_video():
+    global last_video_id
+    try:
+        video_id, video_title, video_url = get_latest_video()
+        if video_id and video_id != last_video_id:
+            last_video_id = video_id
+            save_last_video(video_id)  # ✅ persist the new video
+            channel = bot.get_channel(DISCORD_CHANNEL_ID)
+
+            if isinstance(channel, discord.TextChannel):
+                await channel.send(f"@everyone The main channel 404Crepes uploaded something!\n{video_url}")
+            else:
+                print("The channel is not a text channel!")
+    except Exception as e:
+        print(f"Error in check_new_video loop: {e}")
+
+@check_new_video.before_loop
+async def before_check():
+    await bot.wait_until_ready()
+
+# ------------------------------
 # Bot Events
 # ------------------------------
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')
-    check_new_video.start()
+    if not check_new_video.is_running():
+        check_new_video.start()
 
 # ------------------------------
 # Run Bot
 # ------------------------------
-
 bot.run(DISCORD_TOKEN)
